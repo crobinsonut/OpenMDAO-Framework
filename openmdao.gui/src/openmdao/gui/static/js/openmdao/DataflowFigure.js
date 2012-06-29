@@ -14,6 +14,7 @@ openmdao.DataflowFigure=function(model, pathname, type, valid, maxmin){
 
     this.outputPort=null;
     this.inputPort=null;
+    this.dragEvents = 0;
 
     draw2d.CompartmentFigure.call(this);
 
@@ -251,6 +252,50 @@ openmdao.DataflowFigure.prototype.onDragstart=function(x,y){
         return dragStarted;
     }
 };
+
+openmdao.DataflowFigure.prototype.onDragenter=function(evt){
+    if(this.dragEvents == 0){
+        //Change this.bottom_left,this.bottom_right to circle-plus-drop-zone
+        //Change this.footer, this.contentArea to match color of circle-plus-drop-zone
+        this.bottom_left.style.background="url(/static/images/circle-plus-drop-zone.png) no-repeat bottom left";
+        this.bottom_right.style.background="url(/static/images/circle-plus-drop-zone.png) no-repeat bottom right";
+        this.footer.style.backgroundColor="white";
+        this.contentArea.style.backgroundColor="white";
+    }
+
+    this.dragEvents++;
+    evt.preventDefault();
+    evt.stopPropogation();
+};
+
+openmdao.DataflowFigure.prototype.onDragleave=function(evt){
+    this.dragEvents--;
+    if(this.dragEvents == 0){
+        //Change this.bottom_left,this.bottom_right to circle-plus
+        //Change this.footer, this.contentArea to white
+        this.bottom_left.style.background="url(/static/images/circle-plus.png) no-repeat bottom left";
+        this.bottom_right.style.background="url(/static/images/circle-plus.png) no-repeat bottom right";
+        this.footer.style.backgroundColor = "white";
+        this.contentArea.style.backgroundColor = "white";
+    }
+
+    evt.preventDefault();
+    evt.stopPropogation();
+};
+
+openmdao.DataflowFigure.prototype.onDrop=function(evt){
+    //This should catch the drop.
+    //Add the code to update the DataflowFigure here.
+
+    this.bottom_left.style.background="url(/static/images/circle-plus.png) no-repeat bottom left";
+    this.bottom_right.style.background="url(/static/images/circle-plus.png) no-repeat bottom right";
+    this.footer.style.backgroundColor = "white";
+    this.contentArea.style.backgroundColor = "white";
+    this.dragEvents = 0;
+    evt.preventDefault();
+    evt.stopPropogation();
+};
+
 
 /** TODO: enable moving a component into another dataflow */
 openmdao.DataflowFigure.prototype.onFigureDrop=function(figure){
