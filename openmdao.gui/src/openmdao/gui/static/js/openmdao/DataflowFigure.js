@@ -259,13 +259,13 @@ openmdao.DataflowFigure.prototype.onDragenter=function(evt){
         //Change this.footer, this.contentArea to match color of circle-plus-drop-zone
         this.bottom_left.style.background="url(/static/images/circle-plus-drop-zone.png) no-repeat bottom left";
         this.bottom_right.style.background="url(/static/images/circle-plus-drop-zone.png) no-repeat bottom right";
-        this.footer.style.backgroundColor="white";
-        this.contentArea.style.backgroundColor="white";
+        this.footer.style.backgroundColor="#CFD6FE";
+        this.contentArea.style.backgroundColor="#CFD6FE";
     }
 
     this.dragEvents++;
     evt.preventDefault();
-    evt.stopPropogation();
+    evt.stopPropagation();
 };
 
 openmdao.DataflowFigure.prototype.onDragleave=function(evt){
@@ -280,7 +280,7 @@ openmdao.DataflowFigure.prototype.onDragleave=function(evt){
     }
 
     evt.preventDefault();
-    evt.stopPropogation();
+    evt.stopPropagation();
 };
 
 openmdao.DataflowFigure.prototype.onDrop=function(evt){
@@ -293,7 +293,7 @@ openmdao.DataflowFigure.prototype.onDrop=function(evt){
     this.contentArea.style.backgroundColor = "white";
     this.dragEvents = 0;
     evt.preventDefault();
-    evt.stopPropogation();
+    evt.stopPropagation();
 };
 
 
