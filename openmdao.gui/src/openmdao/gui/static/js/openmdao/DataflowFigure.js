@@ -171,7 +171,7 @@ openmdao.DataflowFigure.prototype.createHTMLElement=function(){
         this.footer.style.backgroundColor="white";
         this.footer.style.borderBottom="1px solid #666666";
         this.footer.style.fontSize="2px";
-        this.footer.className="DataflowFiugreFooter";
+        this.footer.className="DataflowFigureFooter";
 
         this.contentArea=document.createElement("div");
         this.contentArea.style.position="absolute";
