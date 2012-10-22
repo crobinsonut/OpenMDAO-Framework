@@ -4,10 +4,10 @@ var openmdao = (typeof openmdao === "undefined" || !openmdao ) ? {} : openmdao ;
 openmdao.ConstraintsPane = function(elm,model,pathname,name,editable) {
     var constraints,
         constraintsDiv = jQuery("<div id='"+name+"_constraints' >"),
-        buttonSpec = "class='button' style='text-align:center; margin-top:1em;'",
-        addButton = jQuery("<div "+buttonSpec +">Add Constraint</div>"),
-        clrButton = jQuery("<div "+buttonSpec +">Clear Constraints</div>"),
+        addButton = jQuery("<button>Add Constraint</button>").button(),
+        clrButton = jQuery("<button>Clear Constraints</button>").button(),
         columns = [
+            {id:"del",    name:"",            field:"del",     width:25, formatter:buttonFormatter},
             {id:"expr",   name:"Expression",  field:"expr",    width:148},
             {id:"scaler", name:"Scaler",      field:"scaler",  width:60},
             {id:"adder",  name:"Adder",       field:"adder",   width:50},
@@ -20,6 +20,10 @@ openmdao.ConstraintsPane = function(elm,model,pathname,name,editable) {
             autoEdit: false
         };
 
+    function buttonFormatter(row,cell,value,columnDef,dataContext) {  
+        button = '<div class="ui-icon-trash"></div>';
+        return button;
+    }
     elm.append(constraintsDiv);
 
     var table = jQuery('<table width="100%">'),
@@ -41,6 +45,14 @@ openmdao.ConstraintsPane = function(elm,model,pathname,name,editable) {
             model.issueCommand(cmd);
         });
    }
+    constraints.onClick.subscribe(function (e) {
+        var cell = constraints.getCellFromEvent(e);
+        if (cell.cell==0) {
+            var delname = constraints.getData()[cell.row].name
+            cmd = pathname+'.remove_constraint("'+delname+'");';
+            model.issueCommand(cmd);
+        }
+    });   
 
     /** add a new constraint */
     function addConstraint(expr,scaler,adder,name) {

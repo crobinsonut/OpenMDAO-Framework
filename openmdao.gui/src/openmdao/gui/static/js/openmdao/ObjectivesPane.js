@@ -4,10 +4,10 @@ var openmdao = (typeof openmdao === "undefined" || !openmdao ) ? {} : openmdao ;
 openmdao.ObjectivesPane = function(elm,model,pathname,name,editable) {
     var objectives,
         objectivesDiv = jQuery("<div id='"+name+"_objectives' >"),
-        buttonSpec = "class='button' style='text-align:center; margin-top:1em;'",
-        addButton = jQuery("<div "+buttonSpec +">Add Objective</div>"),
-        clrButton = jQuery("<div "+buttonSpec +">Clear Objectives</div>"),
+        addButton = jQuery("<button>Add Objective</button>").button(),
+        clrButton = jQuery("<button>Clear Objectives</button>").button(),
         columns = [
+            {id:"del",   name:"",            field:"del",   width:25, formatter:buttonFormatter},
             {id:"expr",  name:"Expression",  field:"expr",  width:180},
             {id:"name",  name:"Name",        field:"name",  width:50}
         ],
@@ -18,6 +18,10 @@ openmdao.ObjectivesPane = function(elm,model,pathname,name,editable) {
             autoEdit: false
         };
 
+    function buttonFormatter(row,cell,value,columnDef,dataContext) {  
+        button = '<div class="ui-icon-trash"></div>';
+        return button;
+    }
     elm.append(objectivesDiv).width('100%');
 
     var table = jQuery('<table width="100%">'),
@@ -39,6 +43,14 @@ openmdao.ObjectivesPane = function(elm,model,pathname,name,editable) {
             model.issueCommand(cmd);
         });
    }
+    objectives.onClick.subscribe(function (e) {
+        var cell = objectives.getCellFromEvent(e);
+        if (cell.cell==0) {
+            var delname = objectives.getData()[cell.row].name
+            cmd = pathname+'.remove_objective("'+delname+'");';
+            model.issueCommand(cmd);
+        }
+    });
 
     /** add a new objective */
     function addObjective(expr,name) {

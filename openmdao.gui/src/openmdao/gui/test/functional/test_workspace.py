@@ -14,10 +14,14 @@ from nose.tools import with_setup
 from unittest import TestCase
 
 if sys.platform != 'win32':  # No testing on Windows yet.
+    from selenium.common.exceptions import WebDriverException
     from util import main, setup_server, teardown_server, generate, \
                      startup, closeout
+    from pageobjects.basepageobject import TMO
     from pageobjects.util import NotifierPage
     from pageobjects.workspace import WorkspacePage
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys
 
     @with_setup(setup_server, teardown_server)
     def test_generator():
@@ -33,9 +37,61 @@ def _test_console(browser):
     expected = ">>> print 'blah'\nblah"
     eq(workspace_page.history, expected)
 
+    # Check that browser title contains project name.
+    title = browser.title
+    expected = 'OpenMDAO: '+project_dict['name']+' - '
+    eq(title[:len(expected)], expected)
+
     # Clean up.
     closeout(projects_page, project_info_page, project_dict, workspace_page)
 
+
+def _test_console_history(browser):
+    # Check up and down arrow navigation through the command history
+    projects_page, project_info_page, project_dict, workspace_page = startup(browser)
+
+    command_elem = browser.find_element(By.ID, "command")
+
+    # Fill up the command history
+    workspace_page.do_command("import sys")
+    workspace_page.do_command("import os")
+    workspace_page.do_command("import time")
+    
+    # Try out the up and down arrows
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import time")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import os")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import sys")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import sys")
+
+    command_elem.send_keys( Keys.ARROW_DOWN )
+    eq(workspace_page.command, "import os")
+
+    command_elem.send_keys( Keys.ARROW_DOWN )
+    eq(workspace_page.command, "import time")
+
+    command_elem.send_keys( Keys.ARROW_DOWN )
+    eq(workspace_page.command, "import time")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import os")
+
+    workspace_page.do_command("import traceback")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import traceback")
+
+    command_elem.send_keys( Keys.ARROW_UP )
+    eq(workspace_page.command, "import time")
+
+    # Clean up.
+    closeout(projects_page, project_info_page, project_dict, workspace_page)
 
 def _test_palette_update(browser):
     # Import some files and add components from them.
@@ -102,7 +158,7 @@ def _test_palette_update(browser):
             "Expected component name, '%s', to be in list of existing"
             " component names, '%s'" % (paraboloid_name, component_names))
 
-    workspace_page.save_project()
+    workspace_page.commit_project('added paraboloid')
     projects_page = workspace_page.close_workspace()
 
     # Now try to re-open that project to see if items are still there.
@@ -119,9 +175,6 @@ def _test_palette_update(browser):
             % (expected_file_names, file_names))
     browser.close()
     browser.switch_to_window(workspace_window)
-
-    # Now modify the parabola.py file and save the project again.  Pickling will fail
-    # and we'll fall back to using the saved macro
 
     # Clean up.
     closeout(projects_page, project_info_page, project_dict, workspace_page)
@@ -183,7 +236,7 @@ b = Float(0.0, iotype='out')
     conn_page.connect_vars('comp1.b', 'comp2.a')
     conn_page.close()
 
-    workspace_page.save_project()
+    workspace_page.commit_project('added some Foos')
 
     editor_page = workspace_page.open_editor()
     editor_page.edit_file('foo.py', dclick=False)
@@ -199,6 +252,49 @@ b = Float(0.0, iotype='out')
     time.sleep(0.5)
     eq(sorted(workspace_page.get_dataflow_component_names()),
        ['comp1', 'comp2', 'driver', 'top'])
+
+    # Check if running a component is recorded (it shouldn't be).
+    top = workspace_page.get_dataflow_figure('top')
+    top.run()
+    message = NotifierPage.wait(workspace_page)
+    eq(message, 'Run complete: success')
+    history = workspace_page.history.split('\n')
+    eq(history[-2], 'Executing...')
+    eq(history[-1], 'Execution complete.')
+
+    workspace_page.toggle_files('foo.py')
+    workspace_page.expand_folder('_macros')
+    editor = workspace_page.edit_file('_macros/default')
+    contents = editor.get_code()
+    browser.close()
+    browser.switch_to_window(workspace_window)
+    for line in contents.split('\n'):
+        if 'run' in line:
+            raise AssertionError(line)
+
+    # Check if command errors are recorded (they shouldn't be).
+    workspace_page.do_command('print xyzzy', ack=False)
+    # We expect 2 notifiers: command complete and error.
+    # These will likely overlap in a manner that 'Ok' is found but
+    # later is hidden by the second notifier.
+    try:  # We expect 2 notifiers: command complete and error.
+        msg = NotifierPage.wait(workspace_page, base_id='command')
+    except WebDriverException as exc:
+        if 'Element is not clickable' in str(exc):
+            err = NotifierPage.wait(workspace_page)
+            msg = NotifierPage.wait(workspace_page, base_id='command')
+    else:
+        err = NotifierPage.wait(workspace_page)
+    if err != "NameError: name 'xyzzy' is not defined":
+        raise AssertionError('Unexpected message: %r' % err)
+
+    editor = workspace_page.edit_file('_macros/default')
+    contents = editor.get_code()
+    browser.close()
+    browser.switch_to_window(workspace_window)
+    for line in contents.split('\n'):
+        if 'xyzzy' in line:
+            raise AssertionError(line)
 
     # Clean up.
     closeout(projects_page, project_info_page, project_dict, workspace_page)
@@ -240,10 +336,8 @@ def _test_properties(browser):
     projects_page, project_info_page, project_dict, workspace_page = startup(browser)
 
     # Check default 'top'.
-    workspace_page.show_properties()
     workspace_page.select_object('top')
     workspace_page.show_properties()
-    time.sleep(0.5)
     eq(workspace_page.props_header, 'Assembly: top')
     inputs = workspace_page.props_inputs
     eq(inputs.value, [['directory',     ''],
@@ -394,14 +488,15 @@ def _test_console_errors(browser):
     projects_page, project_info_page, project_dict, workspace_page = startup(browser)
 
     # Set input to illegal value.
-    top = workspace_page.get_dataflow_figure('top', '')
-    editor = top.editor_page(double_click=False, base_type='Assembly')
+    top = workspace_page.get_dataflow_figure('driver', 'top')
+    editor = top.editor_page(double_click=False, base_type='Driver')
     inputs = editor.get_inputs()
-    inputs[0][2] = '42'  # directory
+    inputs[2][2] = '42'  # printvars
     message = NotifierPage.wait(editor)
-    eq(message, "TraitError: The 'directory' trait of an Assembly instance"
-                " must be a string, but a value of 42 <type 'int'> was"
-                " specified.")
+    eq(message, "TraitError: The 'printvars' trait of a "
+                "Run_Once instance must be a list of items "
+                "which are a legal value, but a value of 42 "
+                "<type 'int'> was specified.")
     editor.close()
 
     # Attempt to save file with syntax error.
@@ -414,18 +509,7 @@ def execute(self)
     pass
 """, check=False)
 
-    # The error notifier can potentially arrive *before* the save notifier,
-    # resulting in the error notifier being underneath and causing a
-    # WebDriverException.  If that happens, try to handle the save and
-    # then retry the error notifier.
-    message = None
-    try:
-        message = NotifierPage.wait(editor_page, base_id='file-error')
-    except Exception as exc:
-        print 'Exception waiting for file-error:', str(exc) or repr(exc)
-        logging.exception('Waiting for file-error')
-    if message is None:
-        message = NotifierPage.wait(editor_page, base_id='file-error')
+    message = NotifierPage.wait(editor_page, base_id='file-error')
     eq(message, 'invalid syntax (bug.py, line 6)')
 
     browser.close()
@@ -438,7 +522,7 @@ def execute(self)
 from openmdao.main.api import Component
 class Bug2(Component):
 def __init__(self):
-    raise RuntimeError("__init__ failed")
+raise RuntimeError("__init__ failed")
 """)
     browser.close()
     browser.switch_to_window(workspace_window)
@@ -468,9 +552,21 @@ def _test_driver_config(browser):
     dialog.name = 'nonsense'
     dialog('ok').click()
     parameters = editor.get_parameters()
-    expected = [['driver.force_execute', '0', '1', '', '', '', 'nonsense']]
+    expected = [['', 'driver.force_execute', '0', '1', '', '', '', 'nonsense']]
     for i, row in enumerate(parameters.value):
         eq(row, expected[i])
+        
+    # Delete the parameter
+    delbutton = editor('parameters').find_elements_by_css_selector('.ui-icon-trash')
+    delbutton[0].click()
+    parameters = editor.get_parameters()
+    expected = []
+    browser.implicitly_wait(1)  # Not expecting to find anything.
+    try:
+        for i, row in enumerate(parameters.value):
+            eq(row, expected[i])
+    finally:
+        browser.implicitly_wait(TMO)
 
     # Add a (nonsense) named objective.
     editor('objectives_tab').click()
@@ -479,9 +575,21 @@ def _test_driver_config(browser):
     dialog.name = 'nonsense'
     dialog('ok').click()
     objectives = editor.get_objectives()
-    expected = [['driver.force_execute', 'nonsense']]
+    expected = [['', 'driver.force_execute', 'nonsense']]
     for i, row in enumerate(objectives.value):
         eq(row, expected[i])
+
+    # Delete the objective
+    delbutton = editor('objectives').find_elements_by_css_selector('.ui-icon-trash')
+    delbutton[0].click()
+    objectives = editor.get_objectives()
+    expected = []
+    browser.implicitly_wait(1)  # Not expecting to find anything.
+    try:
+        for i, row in enumerate(objectives.value):
+            eq(row, expected[i])
+    finally:
+        browser.implicitly_wait(TMO)
 
     # Add a (nonsense) named constraint.
     editor('constraints_tab').click()
@@ -490,9 +598,21 @@ def _test_driver_config(browser):
     dialog.name = 'nonsense'
     dialog('ok').click()
     constraints = editor.get_constraints()
-    expected = [['driver.force_execute > 0', '1', '0', 'nonsense']]
+    expected = [['', 'driver.force_execute > 0', '1', '0', 'nonsense']]
     for i, row in enumerate(constraints.value):
         eq(row, expected[i])
+        
+    # Delete the constraint
+    delbutton = editor('constraints').find_elements_by_css_selector('.ui-icon-trash')
+    delbutton[0].click()
+    constraints = editor.get_constraints()
+    expected = []
+    browser.implicitly_wait(1)  # Not expecting to find anything.
+    try:
+        for i, row in enumerate(constraints.value):
+            eq(row, expected[i])
+    finally:
+        browser.implicitly_wait(TMO)
 
     # Clean up.
     editor.close()
@@ -517,7 +637,7 @@ def _test_remove(browser):
     # Remove component.
     top.remove()
 
-    time.sleep(0.5)
+    time.sleep(1)
     eq(editor.is_visible, False)
     eq(connections.is_visible, False)
     eq(properties.is_visible, False)
@@ -545,43 +665,149 @@ def _test_noslots(browser):
     # Clean up.
     closeout(projects_page, project_info_page, project_dict, workspace_page)
 
+# without the dialog to prompt for saving, the following 2 tests aren't really
+# useful any more
+#def _test_savechanges(browser):
+    #projects_page, project_info_page, project_dict, workspace_page = startup(browser)
 
-def _test_savechanges(browser):
+    ## Add ExternalCode to assembly.
+    #workspace_page.show_dataflow('top')
+    #workspace_page.add_library_item_to_dataflow(
+        #'openmdao.lib.components.external_code.ExternalCode', 'ext')
+    
+    ##first try to close without saving changes, but click CANCEL and stay 
+    #workspace_page.attempt_to_close_workspace(True, False)
+
+    ## add another object to the model to be sure it didn't close
+    #eq(len(workspace_page.get_dataflow_figures()), 3)
+    #workspace_page.add_library_item_to_dataflow(
+        #'openmdao.lib.components.external_code.ExternalCode', 'ext2')
+    #eq(len(workspace_page.get_dataflow_figures()), 4)
+    
+    ## Clean up.
+    #closeout(projects_page, project_info_page, project_dict, workspace_page)
+
+
+#def _test_dontsavechanges(browser):
+    #projects_page, project_info_page, project_dict, workspace_page = startup(browser)
+
+    ## Add ExternalCode to assembly.
+    #workspace_page.show_dataflow('top')
+    #workspace_page.add_library_item_to_dataflow(
+        #'openmdao.lib.components.external_code.ExternalCode', 'ext')
+    
+    ##Try to close without saving changes, but click OK and leave. 
+    #workspace_page.attempt_to_close_workspace(True, True)
+
+    ## Clean up.
+    #project_info_page = projects_page.edit_project(project_dict['name'])
+    #project_info_page.delete_project()
+    #print "_test_dontsavechanges complete."
+
+
+def _test_logviewer(browser):
+    # Verify log viewer functionality.
+    # Note that by default the logging level is set to WARNING.
     projects_page, project_info_page, project_dict, workspace_page = startup(browser)
+    viewer = workspace_page.show_log()
 
-    # Add ExternalCode to assembly.
-    workspace_page.show_dataflow('top')
-    workspace_page.add_library_item_to_dataflow(
-        'openmdao.lib.components.external_code.ExternalCode', 'ext')
-    
-    #first try to close without saving changes, but click CANCEL and stay 
-    workspace_page.attempt_to_close_workspace(True, False)
+    # Incremental display.
+    workspace_page.do_command("import logging")
+    workspace_page.do_command("logging.error('1 Hello World')")
+    msgs = viewer.get_messages()
+    while "Shouldn't have handled a send event" in msgs[-1]:
+        msgs = msgs[:-1]
+    eq(msgs[-1][-13:], '1 Hello World')
 
-    # add another object to the model to be sure it didn't close
-    eq(len(workspace_page.get_dataflow_figures()), 3)
-    workspace_page.add_library_item_to_dataflow(
-        'openmdao.lib.components.external_code.ExternalCode', 'ext2')
-    eq(len(workspace_page.get_dataflow_figures()), 4)
-    
+    # Exercise pausing the display. Since there's room on-screen,
+    # the lack of scrollbar update isn't noticable.
+    text = viewer.pause()
+    eq(text, 'Pause')
+    for i in range(2, 4):
+        workspace_page.do_command("logging.error('%d Hello World')" % i)
+    text = viewer.pause()  # Toggle-back.
+    eq(text, 'Resume')
+
+    # Clear display.
+    viewer.clear()
+    msgs = viewer.get_messages()
+    eq(msgs, [''])
+
+    # Exercise filtering.
+    logger = pkg_resources.resource_filename('openmdao.gui.test.functional',
+                                             'logger.py')
+    workspace_page.add_file(logger)
+    msgs = viewer.get_messages()
+    # Remove any spurious errors and drop timestamp.
+    initial = [msg[16:] for msg in msgs
+                        if "Shouldn't have handled a send event" not in msg]
+    eq(initial,
+       ['W root: warning 1',
+        'E root: error 1',
+        'C root: critical 1',
+        'W root: warning 2',
+        'E root: error 2',
+        'C root: critical 2',
+        'W root: warning 3',
+        'E root: error 3',
+        'C root: critical 3'])
+
+    # Turn off errors.
+    dialog = viewer.filter()
+    dialog('error_button').click()
+    dialog('ok_button').click()
+
+    msgs = viewer.get_messages()
+    filtered = [msg[16:] for msg in msgs]  # Drop timestamp.
+    eq(filtered,
+       ['W root: warning 1',
+        'C root: critical 1',
+        'W root: warning 2',
+        'C root: critical 2',
+        'W root: warning 3',
+        'C root: critical 3'])
+
     # Clean up.
+    viewer.close()
     closeout(projects_page, project_info_page, project_dict, workspace_page)
 
 
-def _test_dontsavechanges(browser):
+def _test_libsearch(browser):
+    # Verify library search functionality.
     projects_page, project_info_page, project_dict, workspace_page = startup(browser)
 
-    # Add ExternalCode to assembly.
-    workspace_page.show_dataflow('top')
-    workspace_page.add_library_item_to_dataflow(
-        'openmdao.lib.components.external_code.ExternalCode', 'ext')
-    
-    #Try to close without saving changes, but click OK and leave. 
-    workspace_page.attempt_to_close_workspace(True, True)
+    # Get default objects.
+    def_objects = workspace_page.get_object_types()
+    def_searches = workspace_page.get_library_searches()
+
+    # Get 'doe' search results.
+    workspace_page.set_library_filter('doe')
+    objects = workspace_page.get_object_types()
+    eq(objects,
+       ['CentralComposite',
+        'CSVFile',
+        'DOEdriver',
+        'FullFactorial',
+        'NeighborhoodDOEdriver',
+        'OptLatinHypercube',
+        'Uniform'])
+    doe_searches = workspace_page.get_library_searches()
+    eq(doe_searches, def_searches+['doe'])
+
+    # Clear search, now back to default objects.
+    workspace_page.clear_library_filter()
+    objects = workspace_page.get_object_types()
+    eq(objects, def_objects)
+
+    # Get 'xyzzy' search results.
+    workspace_page.set_library_filter('xyzzy')
+    objects = workspace_page.get_object_types()
+    eq(objects, ['No matching records found'])
+    searches = workspace_page.get_library_searches()
+    eq(searches, doe_searches)
 
     # Clean up.
-    project_info_page = projects_page.edit_project(project_dict['name'])
-    project_info_page.delete_project()
-    print "_test_dontsavechanges complete."
+    closeout(projects_page, project_info_page, project_dict, workspace_page)
 
 
 if __name__ == '__main__':
