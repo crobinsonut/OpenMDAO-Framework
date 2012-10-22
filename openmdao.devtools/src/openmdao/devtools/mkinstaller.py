@@ -313,8 +313,11 @@ def after_install(options, home_dir):
     distnames = set([d.project_name for d in dists])-excludes
     gui_dists = working_set.resolve([Requirement.parse('openmdao.gui')])
     guinames = set([d.project_name for d in gui_dists])-distnames-excludes
-    guitest_dists = working_set.resolve([Requirement.parse('openmdao.gui[jsTest]')])
-    guitest_dists.extend(working_set.resolve([Requirement.parse('openmdao.gui[functionalTest]')]))
+    if( sys.platform != "win32" ):
+        guitest_dists = working_set.resolve([Requirement.parse('openmdao.gui[jsTest]')])
+        guitest_dists.extend(working_set.resolve([Requirement.parse('openmdao.gui[functionalTest]')]))
+    else:
+        guitest_dists = []
     guitestnames = set([d.project_name for d in guitest_dists])-distnames-excludes-guinames
     
     try:
