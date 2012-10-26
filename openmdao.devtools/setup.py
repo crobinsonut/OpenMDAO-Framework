@@ -40,7 +40,7 @@ setup(name='openmdao.devtools',
       install_requires=[
           'setuptools',
           'Sphinx',
-          'Fabric>=0.9.3',
+          'Fabric>=0.9.5',
           'virtualenv',
           'openmdao.util',
           'boto',

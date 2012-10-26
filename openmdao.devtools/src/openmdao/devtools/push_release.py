@@ -14,7 +14,12 @@ from openmdao.devtools.utils import get_openmdao_version, put_dir, tar_dir, \
 from openmdao.util.fileutil import find_in_path
 
 
-def _push_release(release_dir, destination, obj, py='python'):
+def _push_release(release_dir, destination, obj, py='python',
+rm=lambda path: "rm -f %s" % path,
+ln=lambda path1, path2: "ln -s -f %s %s" % (path1, path2),
+mkdir=lambda path: "mkdir %s" % path, 
+chmod=lambda permissions, path: "chmod %s %s" % (permissions, path),
+cd=lambda path: "cd %s" % path):
     """Take a directory containing release files (openmdao package 
     distributions, install scripts, etc., and place the files in the 
     proper locations on the server.
@@ -43,22 +48,23 @@ def _push_release(release_dir, destination, obj, py='python'):
     
     # determine version from the form of the go-openmdao-?.?.py file
     version = os.path.splitext(script)[0].split('-', 2)[2]
-    
     # the following will barf if the version already exists on the server
-    obj.run('mkdir %s/downloads/%s' % (destination, version))
-    obj.run('chmod 755 %s/downloads/%s' % (destination, version))
+    import pdb
+    pdb.set_trace()
+    obj.run(mkdir('%s/downloads/%s' % (destination, version)),capture=False)
+    obj.run(chmod( '755', '%s/downloads/%s' % (destination, version)))
 
     # push new distribs to the server
     for f in os.listdir(release_dir):
         if (f.endswith('.tar.gz') and f != 'docs.tar.gz') or f.endswith('.egg'):
             obj.put(os.path.join(release_dir,f), '%s/dists/%s' % (destination, f))
-            obj.run('chmod 644 %s/dists/%s' % (destination, f))
+            obj.run(chmod('644', '%s/dists/%s' % (destination, f)))
     
     # for now, put the go-openmdao script up without the version
     # id in the name
     obj.put(os.path.join(release_dir, 'go-openmdao-%s.py' % version), 
         '%s/downloads/%s/go-openmdao.py' % (destination, version))
-    obj.run('chmod 755 %s/downloads/%s/go-openmdao.py' % (destination, version))
+    obj.run(chmod('755', '%s/downloads/%s/go-openmdao.py' % (destination, version)))
 
     # put the docs on the server
     obj.put_dir(os.path.join(release_dir, 'docs'), 
@@ -77,25 +83,26 @@ def _push_release(release_dir, destination, obj, py='python'):
     
     # update the index.html for the version download directory on the server
     dpath = '%s/downloads/%s' % (destination, version)
-    obj.run('cd %s && %s mkdlversionindex.py' % (dpath, py))
+    obj.run(cd(dpath) + ' && '+ '%s mkdlversionindex.py' % py)
 
     os.chdir(cdir)
     
     # update the index.html for the dists directory on the server
     dpath = '%s/dists' % destination
-    obj.run('cd %s && %s mkegglistindex.py' % (dpath, py))
+    obj.run(cd(dpath) + ' && ' + '%s mkegglistindex.py' % py)
 
     os.chdir(cdir)
     
     # update the 'latest' link
-    obj.run('rm -f %s/downloads/latest' % destination)
-    obj.run('ln -s -f %s %s/downloads/latest' % (version, destination))
+
+    obj.run(rm('%s/downloads/latest' % destination))
+    obj.run(ln('%s' % version, '%s/downloads/latest' % destination))
         
     os.chdir(cdir)
     
     # update the index.html for the downloads directory on the server
     dpath = '%s/downloads' % destination
-    obj.run('cd %s && %s mkdownloadindex.py' % (dpath, py))
+    obj.run(cd(dpath) + ' && ' + '%s mkdownloadindex.py' % py)
 
 
 def _setup_local_release_dir(dpath):
@@ -137,15 +144,25 @@ def push_release(parser, options):
         print "release directory %s not found" % options.releasedir
         sys.exit(-1)
     
-    if not ('@' in destdir or ':' in destdir): # it's a local release test area
+    if not ('@' in destdir or ':' in destdir) or (destdir[1] == ":"): # it's a local release test area
         if not os.path.isdir(destdir):
             _setup_local_release_dir(destdir)
-        comm_obj.put = shutil.copy
-        comm_obj.put_dir = shutil.copytree
+        comm_obj.put = lambda src, dest: shutil.copy(os.path.abspath(src), os.path.abspath(dest))
+        comm_obj.put_dir = lambda src, dest: shutil.copytree(os.path.abspath(src), os.path.abspath(dest))
         comm_obj.run = local
-        
-        _push_release(options.releasedir, destdir, comm_obj, 
-                      py=options.py)
+	
+	if(sys.platform == "win32"):
+	    _push_release(options.releasedir, destdir, comm_obj, 
+                      py=options.py,
+		      rm=lambda path: "del /q %s" % os.path.abspath(path),
+		      cd=lambda path: "cd % s" % os.path.abspath(path),
+		      ln=lambda path1, path2: "mklink /d %s %s" % (os.path.abspath(path1), os.path.abspath(path2)),
+		      mkdir=lambda path: "mkdir %s" % os.path.abspath(path),
+		      chmod=lambda permissions, path: ""
+		      )
+	else:
+	    _push_release(options.releasedir, destdir, comm_obj, py=options.py)
+
     else: # assume destdir is a remote user@host:destdir
         
         # the only remote push destination should be the production server
