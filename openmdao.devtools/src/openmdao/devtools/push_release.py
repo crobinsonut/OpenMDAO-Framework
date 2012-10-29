@@ -49,9 +49,7 @@ cd=lambda path: "cd %s" % path):
     # determine version from the form of the go-openmdao-?.?.py file
     version = os.path.splitext(script)[0].split('-', 2)[2]
     # the following will barf if the version already exists on the server
-    import pdb
-    pdb.set_trace()
-    obj.run(mkdir('%s/downloads/%s' % (destination, version)),capture=False)
+    obj.run(mkdir('%s/downloads/%s' % (destination, version)))
     obj.run(chmod( '755', '%s/downloads/%s' % (destination, version)))
 
     # push new distribs to the server
@@ -156,7 +154,7 @@ def push_release(parser, options):
                       py=options.py,
 		      rm=lambda path: "del /q %s" % os.path.abspath(path),
 		      cd=lambda path: "cd % s" % os.path.abspath(path),
-		      ln=lambda path1, path2: "mklink /d %s %s" % (os.path.abspath(path1), os.path.abspath(path2)),
+		      ln=lambda target, link: "mklink /d %s %s" % (os.path.normpath(link), os.path.normpath(target)),
 		      mkdir=lambda path: "mkdir %s" % os.path.abspath(path),
 		      chmod=lambda permissions, path: ""
 		      )
