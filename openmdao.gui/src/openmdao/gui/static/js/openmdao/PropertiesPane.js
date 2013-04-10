@@ -45,7 +45,64 @@ openmdao.PropertiesPane = function(elm,model,pathname,name,editable,meta) {
 
     elm.append(propsDiv);
     SetupTable();
+   
+    Node = function(id, parent, children, hidden){
+        var self = this;
+        var id = id;
+        var parent = parent;
+        var hidden = hidden;
+        var children = children;
 
+        self.addChild = function(child){
+            self.children.append(child);
+        }
+
+        self.hasChildren = function(){
+            return (children != null) && (children != undefined);
+        }
+
+        self.hasParent = function(){
+            return (parent != null) && (parent != undefined);
+        }
+
+        self.isHidden = function(){
+            return hidden;
+        }
+
+        self.getChildren = function(){
+            return children;
+        }
+        
+        self.getParent = function(){
+            return parent;
+        }
+        
+        self.getId = function(){
+            return id;
+        }
+    };
+ 
+    VariableTree = function(root){
+        self = this;
+        self.root = undefined;
+        self.add(root);
+
+        self.add = function(child){
+            if(!(child.hasParent)){
+                self.root = child;
+            }
+
+            else{
+                self.root = child.getParent();
+                self.
+                self.add(
+            }
+        };
+
+        self.hide = function(child){};
+        self.sort = function(child){};
+
+    }
     //function to convert array to object
    function oc(a)
     {
