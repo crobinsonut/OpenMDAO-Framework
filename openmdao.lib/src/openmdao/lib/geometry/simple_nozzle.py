@@ -27,3 +27,11 @@ class PlugNozzleGeometry(STLGroup):
         self.add(shell,name="cowl")
 
 
+if __name__=="__main__": 
+    pn = PlugNozzleGeometry()
+
+    print pn.list_parameters()
+
+
+
+

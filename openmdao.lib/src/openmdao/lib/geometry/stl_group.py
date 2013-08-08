@@ -40,20 +40,42 @@ class STLGroup(object):
         for comp in self._comps: 
             name = comp.name
             if isinstance(comp, Body): 
-                meta = {'value':comp.delta_C, 'iotype':'in', 'shape':comp.delta_C.shape}
-                tup = ('%s.thickness'%name, meta)
+                val = comp.delta_C[1:,0]
+                meta = {'value':val, 'iotype':'in', 'shape':val.shape, 
+                'desc':"axial location of control points for the ffd"}
+                tup = ('%s.X'%name, meta)
                 params.append(tup)
-                self.param_name_map[tup[0]] = comp.delta_C
-            else: 
-                meta = {'value':comp.delta_Cc, 'iotype':'in', 'shape':comp.delta_Cc.shape}
-                tup = ('%s.centerline'%name, meta) 
-                params.append(tup)
-                self.param_name_map[tup[0]] = comp.delta_Cc
+                self.param_name_map[tup[0]] = val
 
-                meta = {'value':comp.delta_Ct, 'iotype':'in', 'shape':comp.delta_Ct.shape}
+                val = comp.delta_C[:-1,1]
+                meta = {'value':val, 'iotype':'in', 'shape':val.shape, 
+                'desc':"radial location of control points for the ffd"}
+                tup = ('%s.R'%name, meta)
+                params.append(tup)
+                self.param_name_map[tup[0]] = val
+
+
+            else: 
+                val = comp.delta_Cc[1:,0]
+                meta = {'value':val, 'iotype':'in', 'shape':val.shape, 
+                'desc':'axial location of the control points for the centerline of the shell'}
+                tup = ('%s.X'%name, meta) 
+                params.append(tup)
+                self.param_name_map[tup[0]] = val
+
+                val = comp.delta_Cc[:-1,1]
+                meta = {'value':val, 'iotype':'in', 'shape':val.shape, 
+                'desc':'radial location of the control points for the centerline of the shell'}
+                tup = ('%s.R'%name, meta) 
+                params.append(tup)
+                self.param_name_map[tup[0]] = val
+
+                val = comp.delta_Ct[:-1,1]
+                meta = {'value':val, 'iotype':'in', 'shape':val.shape, 
+                'desc':'thickness of the shell at each axial station'}
                 tup = ('%s.thickness'%name, meta) 
                 params.append(tup)
-                self.param_name_map[tup[0]] = comp.delta_Ct
+                self.param_name_map[tup[0]] = val
 
 
         return params
