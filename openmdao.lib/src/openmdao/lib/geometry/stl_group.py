@@ -13,7 +13,10 @@ from openmdao.main.interfaces import IParametricGeometry, implements, IStaticGeo
 
 
 
-class Geometry(object): 
+class STLGroup(object): 
+
+
+    implements(IParametricGeometry, IStaticGeometry)
 
     def __init__(self): 
 
@@ -25,9 +28,9 @@ class Geometry(object):
         self.param_vals = {}
         self.param_name_map = {}
 
+        self._callbacks = []
 
-        implements(IParametricGeometry)
-        implements(IStaticGeometry)
+
 
     #begin methods for IParametricGeometry
     def list_parameters(self): 
@@ -62,11 +65,18 @@ class Geometry(object):
         return [self.param_name_map[n] for n in names]
 
     def regen_model(self): 
-        for comp in self._comps(): 
+        for comp in self._comps: 
             comp.deform()
 
-    def get_static_geometry(): 
+    def get_static_geometry(self): 
         return self
+
+    def register_param_list_changedCB(self, callback):
+        self._callbacks.append(callback)
+
+    def _invoke_callbacks(self): 
+        for cb in self._callbacks: 
+            cb()
     #end methods for IParametricGeometry
 
     #methods for IStaticGeometry
@@ -81,12 +91,12 @@ class Geometry(object):
 
         box = [mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]]
 
+        print box
+
         wv.set_face_data(xyzs, tris, bbox=box, name="surface")
 
 
     #end methods for IStaticGeometry
-
-
 
     def add(self, comp ,name=None): 
         """ addes a new component to the geometry""" 
@@ -100,6 +110,7 @@ class Geometry(object):
 
         #rebuild the param_name_map with new comp
         self.list_parameters()
+        self._invoke_callbacks()
 
 
 

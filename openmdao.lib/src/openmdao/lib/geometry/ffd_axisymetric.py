@@ -96,7 +96,7 @@ class Body(object):
     def deform(self,delta_C=None): 
         """returns new point locations for the given motion of the control 
         points"""
-        if deltaC is not None: 
+        if delta_C is not None: 
             self.delta_C = delta_C 
         self.C_bar = self.C+self.delta_C
         delta_P = self.bs.calc(self.C_bar)
