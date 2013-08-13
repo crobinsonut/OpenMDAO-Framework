@@ -26,6 +26,8 @@ class PlugNozzleGeometry(STLGroup):
         self.add(body,name="plug")
         self.add(shell,name="cowl")
 
+    def get_visualization_data(self, wv):
+        super(PlugNozzleGeometry, self).get_visualization_data(wv)
 
 if __name__=="__main__": 
     pn = PlugNozzleGeometry()
