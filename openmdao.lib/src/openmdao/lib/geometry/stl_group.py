@@ -106,16 +106,15 @@ class STLGroup(object):
         self.linearize()
 
         xyzs = np.array(self.points).flatten().astype(np.float32)
-        tris =  np.array(self.triangles).astype(np.int32)
-
+        tris = np.array(self.triangles).flatten().astype(np.int32)
         mins = np.min(xyzs.reshape((-1,3)), axis=0)
         maxs = np.max(xyzs.reshape((-1,3)), axis=0)
 
         box = [mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]]
 
-        print box
+        #print box
 
-        wv.set_face_data(xyzs, tris, bbox=box, name="surface")
+        wv.set_face_data(xyzs, tris, name="surface")
 
 
     #end methods for IStaticGeometry
@@ -178,19 +177,19 @@ class STLGroup(object):
             if isinstance(comp,Body): 
                 points.extend(comp.stl.points)
                 size = len(points)
-                triangles.extend(comp.stl.triangles + i_offset + 1) #tecplot wants 1 bias index, so I just increment here
+                triangles.extend(comp.stl.triangles + i_offset) #tecplot wants 1 bias index, so I just increment here
                 i_offset = size
                 n_controls += 2*comp.n_controls #X and R for each control point
             else: 
                 points.extend(comp.outer_stl.points)
                 size = len(points)
-                triangles.extend(comp.outer_stl.triangles + i_offset + 1) #tecplot wants 1 bias index, so I just increment here
+                triangles.extend(comp.outer_stl.triangles + i_offset) #tecplot wants 1 bias index, so I just increment here
                 i_offset = size
                 n_controls += 2*comp.n_c_controls #X and R for each control point
 
                 points.extend(comp.inner_stl.points)
                 size = len(points)
-                triangles.extend(comp.inner_stl.triangles + i_offset + 1) #tecplot wants 1 bias index, so I just increment here
+                triangles.extend(comp.inner_stl.triangles + i_offset) #tecplot wants 1 bias index, so I just increment here
                 i_offset = size
                 n_controls += comp.n_t_controls # only R for each control point
 
@@ -354,7 +353,7 @@ class STLGroup(object):
         f.write("\n".join(lines))
         f.close()
 
-class GeomSender(WV_Sender):
+class STLGroupSender(WV_Sender):
 
     def initialize(self, **kwargs):
         eye    = np.array([0.0, 0.0, 7.0], dtype=np.float32)
@@ -369,10 +368,10 @@ class GeomSender(WV_Sender):
 
     @staticmethod
     def supports(obj):
-        return isinstance(obj, Geometry)
+        return isinstance(obj, STLGroup)
 
     def geom_from_obj(self, obj):
-        if isinstance(obj, Geometry):
+        if isinstance(obj, STLGroup):
             obj.get_visualization_data(self.wv)
         else: 
             raise RuntimeError("object must be a Geometry but is a '%s' instead"%(str(type(obj))))
