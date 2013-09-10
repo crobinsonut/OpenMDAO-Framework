@@ -284,6 +284,7 @@ openmdao.WVCanvasFrame = function(id, wv) {
         // UI is in screen coordinates (not object)
         wv.uiMatrix.load(wv.mvMatrix);
         wv.mvMatrix.makeIdentity();
+        wv.mvMatrix.scale(0.5,0.5,0.5)
 
         if (wv.wheelDelta !== 0) {
             var scale = Math.exp(wv.wheelDelta/16.0);
